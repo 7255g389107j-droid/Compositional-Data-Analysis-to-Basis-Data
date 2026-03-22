@@ -1,0 +1,121 @@
+# =================================================================
+# ULTIMATE COMPOSITIONAL DECONVOLUTION: OHTA-AITCHISON ENGINE
+# Methodology: Ohta (2011) + VLR-Purity + Dynamic Poisson Floor
+# Features: 95% Bootstrap CI | Dynamic Scale Correction | No Zero-Sub
+# Tatsuki Itagaki's Code of Beliefs
+# =================================================================
+
+# --- 1. USER-DEFINED FILTERING & DYNAMIC SCALING ---
+set.seed(42) # For reproducibility
+min_abundance_threshold <- 0.00001 # User-defined strict threshold
+
+# Input: 'Dataset' must be a Proportion Matrix (Rows=Samples, Cols=Taxa)
+raw_data <- as.matrix(Dataset)
+n_s <- nrow(raw_data)
+
+# STRICT FILTERING: Only taxa present in ALL samples above threshold
+valid_taxa_mask <- apply(raw_data, 2, function(x) all(x >= min_abundance_threshold))
+if(sum(valid_taxa_mask) < 2) stop("Too few taxa passed filtering. Lower the threshold.")
+
+d_m <- raw_data[, valid_taxa_mask, drop = FALSE]
+taxa_ids <- colnames(d_m)
+if(is.null(taxa_ids)) taxa_ids <- paste0("Taxon_", 1:ncol(d_m))
+
+# [CRITICAL FIX] Dynamic Effective Library Size
+# Estimates the physical noise floor based on the actual data density
+avg_min_val <- mean(apply(d_m, 2, min))
+eff_lib <- 1 / avg_min_val 
+
+# --- 2. THE TRIPLE-STABILITY CORE ENGINE ---
+get_metrics <- function(P) {
+  L <- log(P)
+  # [A] Physical: Invariance Ratio (IR) vs Dynamic Poisson Floor
+  # Formula: Observed Var / (1 / (Proportion * Effective Depth))
+  obs_v <- apply(L, 2, var)
+  theo_v <- 1 / (colMeans(P) * eff_lib)
+  ir <- obs_v / (theo_v + 1e-18)
+  
+  # [B] Geometric: Purity Index (PI) via Variation Matrix (VLR)
+  # Identifies the geometric center of the compositional simplex
+  vlr <- var(L)
+  pi_s <- 1 / (apply(outer(obs_v, obs_v, "+") - 2 * vlr, 1, median) + 1e-18)
+  
+  # [C] Statistical: Ohta's Win Count (CV-Asymmetry)
+  # Non-parametric winner for the most stable denominator
+  win <- numeric(ncol(P))
+  for (j in 1:ncol(P)) {
+    r <- P / P[, j]
+    win[j] <- sum(apply(r, 2, function(x) sd(x)/mean(x)) < 
+                  apply(1/r, 2, function(x) sd(x)/mean(x)), na.rm=TRUE)
+  }
+  return(list(ir=ir, pi=pi_s, win=win))
+}
+
+m_global <- get_metrics(d_m)
+
+# SIGNAL CLASSIFICATION (Biological flux vs Physical noise)
+sig_class <- ifelse(m_global$ir < 2.0, "PHYSICAL NOISE", 
+             ifelse(m_global$ir < 10.0, "PRACTICAL PROXY", "BIOLOGICAL SIGNAL"))
+
+# --- 3. BOOTSTRAP FOR 95% CI (n=1000) ---
+n_boot <- 1000
+boot_sf <- array(NA, dim=c(n_boot, n_s, 3)) 
+top_indices <- c(which.min(m_global$ir), which.max(m_global$pi), which.max(m_global$win))
+
+for(b in 1:n_boot) {
+  idx <- sample(1:n_s, replace=TRUE)
+  for(m_i in 1:3) {
+    anchor_id <- top_indices[m_i]
+    full_sf <- 1 / d_m[, anchor_id]
+    boot_sf[b, , m_i] <- full_sf / mean(full_sf[idx])
+  }
+}
+
+# --- 4. VISUALIZATION: THREE INDEPENDENT RECOVERY PLOTS ---
+draw_recovery <- function(m_idx, title, col) {
+  id <- top_indices[m_idx]
+  mu  <- apply(boot_sf[,,m_idx], 2, mean)
+  low <- apply(boot_sf[,,m_idx], 2, quantile, probs=0.025)
+  upp <- apply(boot_sf[,,m_idx], 2, quantile, probs=0.975)
+  
+  dev.new(width=12, height=7)
+  par(mar=c(7, 6, 6, 4))
+  
+  y_max <- max(upp) * 1.5
+  bp <- barplot(mu, main=paste(title, "\nAnchor:", taxa_ids[id]), 
+                col=col, border=NA, ylim=c(0, y_max),
+                ylab="Absolute Scaling Factor (Mass Reconstruction)", 
+                xlab="Sample Number Index", names.arg=1:n_s, las=1)
+  
+  # Error bars for 95% CI
+  arrows(bp, low, bp, upp, angle=90, code=3, length=0.04, col="black", lwd=1.2)
+  # Text labels for Scaling Ratios (Optimized positioning)
+  text(bp, upp, labels=round(mu, 2), pos=3, cex=0.75, xpd=TRUE, col="darkblue", font=2)
+  abline(h=1, lty=2, col="gray40")
+  mtext(paste("Status:", sig_class[id], "| 95% Bootstrap CI"), side=3, line=0.5, cex=0.9)
+}
+
+# Generate Plots
+draw_recovery(1, "Metric 1: Min IR (Physical Floor)", "#27ae60")
+draw_recovery(2, "Metric 2: Max PI (Geometric Purity)", "#2980b9")
+draw_recovery(3, "Metric 3: Max Win (Ohta's Asymmetry)", "#f39c12")
+
+# --- 5. FINAL ANALYTICAL REPORT ---
+final_report <- data.frame(
+  Taxon = taxa_ids, 
+  IR = round(m_global$ir, 4), 
+  PI = round(m_global$pi, 4), 
+  Win = m_global$win, 
+  Class = sig_class
+)
+# Sorted by composite stability rank
+final_report <- final_report[order(rank(final_report$IR) + rank(-final_report$PI)), ]
+
+cat("\n==========================================================\n")
+cat("      DECONVOLUTION ENGINE: ANCHOR STABILITY REPORT       \n")
+cat("==========================================================\n")
+print(head(final_report, 15), row.names = FALSE)
+cat("----------------------------------------------------------\n")
+cat(sprintf("PHYSICAL INVARIANCE CONFIDENCE: IR-Min = %.4f\n", min(m_global$ir)))
+cat(sprintf("DYNAMIC SCALE USED (EFF_LIB): %.2e\n", eff_lib))
+cat("==========================================================\n")
