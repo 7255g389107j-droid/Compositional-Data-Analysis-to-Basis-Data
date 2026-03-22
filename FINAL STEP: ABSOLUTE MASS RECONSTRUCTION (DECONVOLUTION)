@@ -1,0 +1,32 @@
+# =================================================================
+# FINAL STEP: ABSOLUTE MASS RECONSTRUCTION (DECONVOLUTION)
+# Using the Optimal Anchor (Low IR + Short Error Bars)
+# =================================================================
+
+# 1. DEFINE THE OPTIMAL ANCHOR
+# Replace "Your_Anchor_Name" with the Taxon ID identified as the Winner
+optimal_anchor_id <- "Your_Anchor_Name" 
+
+# 2. CALCULATE THE SCALING FACTOR (SF)
+# SF = 1 / Anchor_Proportion. This represents the relative Total Mass.
+scaling_factor <- 1 / Dataset[, optimal_anchor_id]
+
+# 3. RECONSTRUCT ABSOLUTE ABUNDANCE MATRIX
+# Multiply every relative value by the Scaling Factor of that sample
+absolute_mass_matrix <- Dataset * scaling_factor
+
+# 4. EXPORT THE TRUTH
+write.csv(absolute_mass_matrix, "Deconvoluted_Absolute_Mass_Table.csv")
+
+# 5. VALIDATION SUMMARY
+cat("\n==========================================================\n")
+cat("      DECONVOLUTION COMPLETED: THE TRUTH IS REVEALED      \n")
+cat("==========================================================\n")
+cat(sprintf("SELECTED OPTIMAL ANCHOR : %s\n", optimal_anchor_id))
+cat(sprintf("SAMPLES PROCESSED       : %d\n", nrow(absolute_mass_matrix)))
+cat(sprintf("TAXA RECONSTRUCTED      : %d\n", ncol(absolute_mass_matrix)))
+cat("FILE SAVED: Deconvoluted_Absolute_Mass_Table.csv\n")
+cat("==========================================================\n")
+
+# Display first 10 rows/columns of the absolute mass
+print(head(absolute_mass_matrix[, 1:min(10, ncol(absolute_mass_matrix))]))
