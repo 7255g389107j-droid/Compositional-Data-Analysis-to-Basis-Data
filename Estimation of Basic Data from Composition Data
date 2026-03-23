@@ -3,6 +3,9 @@
 # Methodology: Ohta (2011) + VLR-Purity + Dynamic Poisson Floor
 # Features: 95% Bootstrap CI | Dynamic Scale Correction | No Zero-Sub
 # Tatsuki Itagaki's Code of Beliefs
+# Developed by: Tatsuki Itagaki
+# License: CC BY 4.0 (https://creativecommons.org)
+# Please cite DOI: 10.13140/RG.2.2.10891.14886 and 10.1007/s11004-011-9332-y when using this code.
 # =================================================================
 
 # --- 1. USER-DEFINED FILTERING & DYNAMIC SCALING ---
