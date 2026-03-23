@@ -1,6 +1,15 @@
 # =================================================================
 # FINAL STEP: ABSOLUTE MASS RECONSTRUCTION (DECONVOLUTION)
 # Using the Optimal Anchor (Low IR + Short Error Bars)
+# Developed by: Tatsuki Itagaki
+# Copyright (c) 2026 Tatsuki Itagaki
+# License: MIT License (https://opensource.org)
+# 
+# ACADEMIC CITATION:
+# If you use this software or its logic in your research, 
+# please cite the following works:
+# 1. Itagaki, T., et al. (2026). DOI: 10.13140/RG.2.2.10891.14886
+# 2. Ohta, T. (2011). DOI: 10.1007/s11004-011-9332-y
 # =================================================================
 
 # 1. DEFINE THE OPTIMAL ANCHOR
